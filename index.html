@@ -1,0 +1,1527 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>回声信使</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+            user-select: none;
+        }
+
+        body {
+            background: #000;
+            min-height: 100vh;
+            overflow: hidden;
+            font-family: Arial, sans-serif;
+            touch-action: manipulation;
+        }
+
+        .game-container {
+            position: relative;
+            width: 100%;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+        }
+
+        /* 声音波纹背景 */
+        .sound-ripple {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 0;
+            height: 0;
+            border-radius: 50%;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            animation: ripple 1s ease-out forwards;
+            pointer-events: none;
+        }
+
+        @keyframes ripple {
+            to {
+                width: 300px;
+                height: 300px;
+                opacity: 0;
+            }
+        }
+
+        /* 按钮容器 */
+        .buttons-container {
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            z-index: 10;
+        }
+
+        /* 录音按钮 */
+        .btn-record {
+            width: 120px;
+            height: 120px;
+            border-radius: 50%;
+            background: #fff;
+            border: none;
+            cursor: pointer;
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+            position: relative;
+            outline: none;
+            box-shadow: 0 0 30px rgba(255, 255, 255, 0.3);
+        }
+
+        .btn-record:hover {
+            transform: scale(1.1);
+            box-shadow: 0 0 50px rgba(255, 255, 255, 0.5);
+        }
+
+        .btn-record:active {
+            transform: scale(0.95);
+        }
+
+        .btn-record.recording {
+            background: #ff3333;
+            animation: pulse 1s infinite;
+            box-shadow: 0 0 50px rgba(255, 0, 0, 0.5);
+        }
+
+        .btn-record.completed {
+            background: #33ff33;
+            box-shadow: 0 0 50px rgba(0, 255, 0, 0.5);
+        }
+
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+        }
+
+        /* 录音按钮内部图标 */
+        .btn-record::after {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 40px;
+            height: 40px;
+            background: #000;
+            border-radius: 50%;
+            transition: background 0.3s;
+        }
+
+        .btn-record.recording::after {
+            width: 30px;
+            height: 30px;
+            border-radius: 5px;
+        }
+
+        .btn-record.completed::after {
+            background: #000;
+            width: 20px;
+            height: 20px;
+            border-radius: 0 0 0 0;
+            border-left: 3px solid #000;
+            border-bottom: 3px solid #000;
+            transform: translate(-50%, -60%) rotate(-45deg);
+        }
+
+        /* 播放按钮 */
+        .btn-play {
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            background: #0066ff;
+            border: none;
+            cursor: pointer;
+            transition: all 0.2s;
+            margin-top: 20px;
+            outline: none;
+            opacity: 0.5;
+            box-shadow: 0 0 20px rgba(0, 102, 255, 0.3);
+        }
+
+        .btn-play:hover:not(:disabled) {
+            transform: scale(1.1);
+            opacity: 1;
+            box-shadow: 0 0 30px rgba(0, 102, 255, 0.5);
+        }
+
+        .btn-play:active:not(:disabled) {
+            transform: scale(0.95);
+        }
+
+        .btn-play:disabled {
+            background: #333;
+            cursor: not-allowed;
+            box-shadow: none;
+        }
+
+        .btn-play.enabled {
+            opacity: 1;
+        }
+
+        /* 播放按钮三角形 */
+        .btn-play::after {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 55%;
+            transform: translate(-50%, -50%);
+            width: 0;
+            height: 0;
+            border-top: 12px solid transparent;
+            border-bottom: 12px solid transparent;
+            border-left: 20px solid #fff;
+        }
+
+        /* 求助按钮 */
+        .btn-help {
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            background: #ffcc00;
+            border: none;
+            cursor: pointer;
+            transition: all 0.2s;
+            position: absolute;
+            right: -80px;
+            bottom: 0;
+            outline: none;
+            box-shadow: 0 0 15px rgba(255, 204, 0, 0.3);
+        }
+
+        .btn-help:hover {
+            transform: scale(1.1);
+            box-shadow: 0 0 25px rgba(255, 204, 0, 0.5);
+        }
+
+        .btn-help:active {
+            transform: scale(0.95);
+        }
+
+        /* 问号图标 */
+        .btn-help::after {
+            content: '?';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: #000;
+            font-size: 24px;
+            font-weight: bold;
+        }
+
+        /* 进度指示器 */
+        .progress-container {
+            position: fixed;
+            top: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 15px;
+            z-index: 100;
+        }
+
+        .fragment {
+            width: 25px;
+            height: 25px;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.1);
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .fragment.collected {
+            background: #00ff00;
+            border-color: #00ff00;
+            box-shadow: 0 0 20px rgba(0, 255, 0, 0.5);
+            transform: scale(1.2);
+        }
+
+        .fragment.collecting {
+            animation: collect 0.5s ease-out;
+        }
+
+        @keyframes collect {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.5); }
+            100% { transform: scale(1.2); }
+        }
+
+        /* 关卡指示器 */
+        .level-indicator {
+            position: fixed;
+            top: 70px;
+            left: 50%;
+            transform: translateX(-50%);
+            color: rgba(255, 255, 255, 0.5);
+            font-size: 14px;
+            z-index: 100;
+        }
+
+        /* 声音分析可视化 */
+        .sound-visualizer {
+            position: fixed;
+            bottom: 100px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 3px;
+            align-items: flex-end;
+            height: 60px;
+            z-index: 100;
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+
+        .sound-visualizer.active {
+            opacity: 1;
+        }
+
+        .visualizer-bar {
+            width: 4px;
+            background: linear-gradient(to top, #00ff00, #ff0000);
+            border-radius: 2px;
+            transition: height 0.05s;
+        }
+
+        /* 状态提示 */
+        .status-hint {
+            position: fixed;
+            bottom: 180px;
+            left: 50%;
+            transform: translateX(-50%);
+            color: rgba(255, 255, 255, 0.6);
+            font-size: 12px;
+            z-index: 100;
+            opacity: 0;
+            transition: opacity 0.3s;
+            text-align: center;
+        }
+
+        .status-hint.visible {
+            opacity: 1;
+        }
+
+        /* 调试面板 */
+        .debug-panel {
+            position: fixed;
+            bottom: 10px;
+            left: 10px;
+            background: rgba(0, 0, 0, 0.9);
+            color: #0f0;
+            padding: 15px;
+            font-size: 11px;
+            font-family: 'Courier New', monospace;
+            display: none;
+            z-index: 1000;
+            border: 1px solid #0f0;
+            border-radius: 5px;
+        }
+
+        .debug-panel.visible {
+            display: block;
+        }
+
+        .debug-panel div {
+            margin-bottom: 5px;
+        }
+
+        .debug-panel .label {
+            color: #888;
+        }
+
+        /* 游戏引导 */
+        .guide-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.95);
+            z-index: 2000;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.5s;
+        }
+
+        .guide-overlay.visible {
+            opacity: 1;
+            pointer-events: all;
+        }
+
+        .guide-circle {
+            width: 150px;
+            height: 150px;
+            border: 3px solid rgba(255, 255, 255, 0.8);
+            border-radius: 50%;
+            animation: guidePulse 2s infinite;
+            position: relative;
+        }
+
+        .guide-circle::after {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 50px;
+            height: 50px;
+            background: #fff;
+            border-radius: 50%;
+        }
+
+        @keyframes guidePulse {
+            0%, 100% { transform: scale(1); opacity: 1; }
+            50% { transform: scale(1.1); opacity: 0.8; }
+        }
+
+        .guide-text {
+            color: rgba(255, 255, 255, 0.8);
+            margin-top: 30px;
+            font-size: 18px;
+        }
+
+        /* 通关提示 */
+        .victory-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.9);
+            z-index: 1500;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.5s;
+        }
+
+        .victory-overlay.visible {
+            opacity: 1;
+            pointer-events: all;
+        }
+
+        .victory-title {
+            color: #00ff00;
+            font-size: 48px;
+            margin-bottom: 20px;
+            text-shadow: 0 0 30px rgba(0, 255, 0, 0.5);
+        }
+
+        .victory-subtitle {
+            color: rgba(255, 255, 255, 0.8);
+            font-size: 18px;
+        }
+
+        /* 移动端适配 */
+        @media (max-width: 600px) {
+            .btn-record {
+                width: 100px;
+                height: 100px;
+            }
+
+            .btn-record::after {
+                width: 35px;
+                height: 35px;
+            }
+
+            .btn-play {
+                width: 50px;
+                height: 50px;
+                margin-top: 15px;
+            }
+
+            .btn-help {
+                width: 40px;
+                height: 40px;
+                right: -60px;
+            }
+
+            .btn-help::after {
+                font-size: 20px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="game-container">
+        <!-- 进度指示器 -->
+        <div class="progress-container">
+            <div class="fragment" id="fragment1"></div>
+            <div class="fragment" id="fragment2"></div>
+            <div class="fragment" id="fragment3"></div>
+        </div>
+
+        <!-- 关卡指示器 -->
+        <div class="level-indicator" id="levelIndicator">第一关：寂静森林</div>
+
+        <!-- 声音波纹容器 -->
+        <div id="rippleContainer"></div>
+
+        <!-- 声音分析可视化 -->
+        <div class="sound-visualizer" id="soundVisualizer">
+            <!-- 动态生成 -->
+        </div>
+
+        <!-- 状态提示 -->
+        <div class="status-hint" id="statusHint"></div>
+
+        <!-- 游戏引导 -->
+        <div class="guide-overlay" id="guideOverlay">
+            <div class="guide-circle"></div>
+            <div class="guide-text">点击白色按钮开始</div>
+        </div>
+
+        <!-- 通关提示 -->
+        <div class="victory-overlay" id="victoryOverlay">
+            <div class="victory-title">通过!</div>
+            <div class="victory-subtitle" id="victorySubtitle">进入下一关</div>
+        </div>
+
+        <!-- 按钮容器 -->
+        <div class="buttons-container">
+            <button class="btn-record" id="btnRecord"></button>
+            <button class="btn-play" id="btnPlay" disabled></button>
+            <button class="btn-help" id="btnHelp"></button>
+        </div>
+
+        <!-- 调试面板 -->
+        <div class="debug-panel" id="debugPanel">
+            <div><span class="label">频率:</span> <span id="debugFreq">0</span> Hz</div>
+            <div><span class="label">时长:</span> <span id="debugDuration">0</span> s</div>
+            <div><span class="label">音量:</span> <span id="debugVolume">0</span></div>
+            <div><span class="label">方差:</span> <span id="debugVariance">0</span></div>
+            <div><span class="label">动作:</span> <span id="debugAction">-</span></div>
+            <div><span class="label">位置:</span> <span id="debugPos">0, 0</span></div>
+            <div><span class="label">关卡:</span> <span id="debugLevel">1</span></div>
+            <div><span class="label">碎片:</span> <span id="debugFragments">0/3</span></div>
+        </div>
+    </div>
+
+    <script>
+    // ===== 游戏配置 =====
+    const CONFIG = {
+        RECORD_MIN: 2000,
+        RECORD_MAX: 8000,
+
+        // 声音阈值
+        FREQ_HIGH: 800,
+        FREQ_LOW: 300,
+        DURATION_SHORT: 0.5,
+        DURATION_LONG: 2,
+        VOLUME_VARIANCE: 0.6,
+
+        // 游戏物理
+        MOVE_SPEED: 30,
+        JUMP_HEIGHT: 80,
+        JUMP_DURATION: 400,
+
+        // 关卡配置
+        LEVELS: [
+            { name: '寂静森林', bgSound: 'forest' },
+            { name: '深海迷宫', bgSound: 'ocean' },
+            { name: '城市交响', bgSound: 'city' }
+        ],
+
+        // 碎片激活条件
+        FRAGMENTS: [
+            [ // 第一关
+                { minFreq: 1000, maxFreq: 2000, minDuration: 1, name: '模仿鸟叫(高频1秒+)' },
+                { minVolume: 0.2, maxVolume: 0.4, maxDuration: 0.5, name: '轻轻敲击(中等音量短声)' },
+                { minFreq: 500, maxFreq: 1000, minDuration: 2, name: '持续啊声(中频2秒+)' }
+            ],
+            [ // 第二关
+                { minFreq: 100, maxFreq: 200, minDuration: 2, name: '鲸鱼叫声(低频2秒+)' },
+                { minFreq: 2000, maxFreq: 3000, minDuration: 1, name: '吹口哨(高频1秒+)' },
+                { minVolume: 0.4, maxDuration: 0.3, name: '拍手(短促响亮)' }
+            ],
+            [ // 第三关
+                { minFreq: 800, maxFreq: 1500, maxDuration: 0.5, name: '汽车喇叭(中高频短声)' },
+                { minVolume: 0.6, maxVolume: 0.9, maxDuration: 0.5, name: '跺脚(大声短促)' },
+                { minDuration: 3, minVolume: 0.3, name: '唱歌(持续3秒+)' }
+            ]
+        ]
+    };
+
+    // ===== 游戏状态 =====
+    const gameState = {
+        currentLevel: 0,
+        fragments: [[false, false, false], [false, false, false], [false, false, false]],
+        playerPos: { x: 0, y: 0 },
+        isRecording: false,
+        isPlaying: false,
+        audioContext: null,
+        mediaRecorder: null,
+        recordedChunks: [],
+        lastRecording: null,
+        lastAnalysis: null,
+        debugMode: false,
+        longPressTimer: null,
+        environmentSound: null,
+        analyserNode: null,
+        animationFrame: null
+    };
+
+    // ===== DOM元素 =====
+    const elements = {
+        btnRecord: document.getElementById('btnRecord'),
+        btnPlay: document.getElementById('btnPlay'),
+        btnHelp: document.getElementById('btnHelp'),
+        rippleContainer: document.getElementById('rippleContainer'),
+        soundVisualizer: document.getElementById('soundVisualizer'),
+        statusHint: document.getElementById('statusHint'),
+        guideOverlay: document.getElementById('guideOverlay'),
+        victoryOverlay: document.getElementById('victoryOverlay'),
+        victorySubtitle: document.getElementById('victorySubtitle'),
+        levelIndicator: document.getElementById('levelIndicator'),
+        debugPanel: document.getElementById('debugPanel'),
+        fragments: [
+            document.getElementById('fragment1'),
+            document.getElementById('fragment2'),
+            document.getElementById('fragment3')
+        ]
+    };
+
+    // ===== 音频系统 =====
+    class AudioSystem {
+        constructor() {
+            this.audioContext = null;
+            this.analyser = null;
+            this.gainNode = null;
+            this.environmentGain = null;
+        }
+
+        initialize() {
+            if (this.audioContext) return;
+
+            this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            this.analyser = this.audioContext.createAnalyser();
+            this.analyser.fftSize = 2048;
+            this.analyser.smoothingTimeConstant = 0.8;
+
+            this.gainNode = this.audioContext.createGain();
+            this.gainNode.connect(this.audioContext.destination);
+
+            this.environmentGain = this.audioContext.createGain();
+            this.environmentGain.gain.value = 0.1;
+            this.environmentGain.connect(this.audioContext.destination);
+        }
+
+        // 生成音调
+        playTone(frequency, duration, type = 'sine', volume = 0.3) {
+            if (!this.audioContext) this.initialize();
+
+            const oscillator = this.audioContext.createOscillator();
+            const gainNode = this.audioContext.createGain();
+
+            oscillator.type = type;
+            oscillator.frequency.setValueAtTime(frequency, this.audioContext.currentTime);
+
+            gainNode.gain.setValueAtTime(volume, this.audioContext.currentTime);
+            gainNode.gain.exponentialRampToValueAtTime(0.01, this.audioContext.currentTime + duration);
+
+            oscillator.connect(gainNode);
+            gainNode.connect(this.gainNode);
+
+            oscillator.start();
+            oscillator.stop(this.audioContext.currentTime + duration);
+        }
+
+        // 提示音
+        playStartSound() {
+            this.playTone(880, 0.15, 'sine', 0.2);
+            setTimeout(() => this.playTone(1100, 0.1, 'sine', 0.15), 100);
+        }
+
+        playEndSound() {
+            this.playTone(660, 0.15, 'sine', 0.2);
+            setTimeout(() => this.playTone(440, 0.1, 'sine', 0.15), 100);
+        }
+
+        playErrorSound() {
+            this.playTone(200, 0.4, 'sawtooth', 0.15);
+            setTimeout(() => this.playTone(150, 0.3, 'sawtooth', 0.1), 200);
+        }
+
+        // 游戏音效
+        playMoveSound(direction) {
+            const freqMap = { up: 600, down: 400, forward: 500 };
+            this.playTone(freqMap[direction] || 500, 0.2, 'sine', 0.15);
+        }
+
+        playJumpSound() {
+            this.playTone(800, 0.15, 'sine', 0.2);
+            setTimeout(() => this.playTone(1200, 0.2, 'sine', 0.25), 100);
+        }
+
+        playConfusedSound() {
+            for (let i = 0; i < 3; i++) {
+                setTimeout(() => this.playTone(250 + i * 50, 0.2, 'sawtooth', 0.1), i * 150);
+            }
+        }
+
+        playCollectSound() {
+            const notes = [523, 659, 784, 1047];
+            notes.forEach((freq, i) => {
+                setTimeout(() => this.playTone(freq, 0.2, 'sine', 0.25), i * 80);
+            });
+        }
+
+        playVictorySound() {
+            const notes = [523, 659, 784, 1047, 1319, 1568];
+            notes.forEach((freq, i) => {
+                setTimeout(() => this.playTone(freq, 0.3, 'sine', 0.2), i * 150);
+            });
+        }
+
+        playHelpSound() {
+            this.playTone(500, 0.3, 'sine', 0.1);
+            setTimeout(() => this.playTone(700, 0.4, 'sine', 0.15), 200);
+        }
+
+        playFragmentHint(index) {
+            const hints = [
+                [1000, 1500], // 鸟叫频率
+                [300, 400],   // 敲击频率
+                [600, 800]    // 啊声频率
+            ];
+            const [f1, f2] = hints[index] || [500, 700];
+            this.playTone(f1, 0.3, 'sine', 0.2);
+            setTimeout(() => this.playTone(f2, 0.3, 'sine', 0.2), 300);
+        }
+
+        // 环境音效
+        startEnvironment(type) {
+            if (!this.audioContext) this.initialize();
+            if (this.environmentSound) {
+                this.environmentSound.noise.stop();
+            }
+
+            const bufferSize = 2 * this.audioContext.sampleRate;
+            const buffer = this.audioContext.createBuffer(1, bufferSize, this.audioContext.sampleRate);
+            const data = buffer.getChannelData(0);
+
+            for (let i = 0; i < bufferSize; i++) {
+                data[i] = Math.random() * 2 - 1;
+            }
+
+            const noise = this.audioContext.createBufferSource();
+            noise.buffer = buffer;
+            noise.loop = true;
+
+            const filter = this.audioContext.createBiquadFilter();
+            const lfo = this.audioContext.createOscillator();
+            const lfoGain = this.audioContext.createGain();
+
+            switch (type) {
+                case 'forest':
+                    filter.type = 'lowpass';
+                    filter.frequency.value = 800;
+                    filter.Q.value = 1;
+                    lfo.frequency.value = 0.3;
+                    lfoGain.gain.value = 100;
+                    break;
+                case 'ocean':
+                    filter.type = 'lowpass';
+                    filter.frequency.value = 400;
+                    filter.Q.value = 2;
+                    lfo.frequency.value = 0.1;
+                    lfoGain.gain.value = 200;
+                    break;
+                case 'city':
+                    filter.type = 'bandpass';
+                    filter.frequency.value = 600;
+                    filter.Q.value = 3;
+                    lfo.frequency.value = 0.5;
+                    lfoGain.gain.value = 50;
+                    break;
+            }
+
+            lfo.connect(lfoGain);
+            lfoGain.connect(filter.frequency);
+
+            noise.connect(filter);
+            filter.connect(this.environmentGain);
+            noise.start();
+            lfo.start();
+
+            this.environmentSound = { noise, filter, lfo, lfoGain };
+        }
+
+        stopEnvironment() {
+            if (this.environmentSound) {
+                this.environmentSound.noise.stop();
+                this.environmentSound.lfo.stop();
+                this.environmentSound = null;
+            }
+        }
+
+        setEnvironmentVolume(volume) {
+            if (this.environmentGain) {
+                this.environmentGain.gain.value = Math.min(0.3, volume * 0.5);
+            }
+        }
+
+        // 分析录音
+        analyzeRecording(audioBuffer) {
+            const channelData = audioBuffer.getChannelData(0);
+            const sampleRate = audioBuffer.sampleRate;
+            const duration = audioBuffer.duration;
+
+            // 计算音量
+            let sumVolume = 0;
+            let sumSquaredDiff = 0;
+            const volumes = [];
+            const windowSize = Math.floor(sampleRate * 0.05); // 50ms窗口
+
+            for (let i = 0; i < channelData.length; i += windowSize) {
+                let windowSum = 0;
+                for (let j = 0; j < windowSize && i + j < channelData.length; j++) {
+                    windowSum += Math.abs(channelData[i + j]);
+                }
+                const avg = windowSum / windowSize;
+                volumes.push(avg);
+                sumVolume += avg;
+            }
+
+            const avgVolume = sumVolume / volumes.length;
+
+            for (const vol of volumes) {
+                sumSquaredDiff += Math.pow(vol - avgVolume, 2);
+            }
+            const variance = sumSquaredDiff / volumes.length;
+
+            // 频率分析 - 使用自相关算法
+            const avgFreq = this.detectPitch(channelData, sampleRate);
+
+            return {
+                averageFrequency: avgFreq,
+                duration: duration,
+                averageVolume: avgVolume,
+                volumeVariance: variance
+            };
+        }
+
+        // 自相关算法检测音高
+        detectPitch(buffer, sampleRate) {
+            const SIZE = buffer.length;
+            let rms = 0;
+
+            for (let i = 0; i < SIZE; i++) {
+                rms += buffer[i] * buffer[i];
+            }
+            rms = Math.sqrt(rms / SIZE);
+
+            if (rms < 0.01) return 0; // 静音
+
+            let r1 = 0, r2 = SIZE - 1;
+            const threshold = 0.2;
+
+            for (let i = 0; i < SIZE / 2; i++) {
+                if (Math.abs(buffer[i]) < threshold) {
+                    r1 = i;
+                    break;
+                }
+            }
+
+            for (let i = 1; i < SIZE / 2; i++) {
+                if (Math.abs(buffer[SIZE - i]) < threshold) {
+                    r2 = SIZE - i;
+                    break;
+                }
+            }
+
+            buffer = buffer.slice(r1, r2);
+            const trimmedSize = buffer.length;
+
+            const correlations = new Array(trimmedSize).fill(0);
+
+            for (let lag = 0; lag < trimmedSize; lag++) {
+                let sum = 0;
+                for (let i = 0; i < trimmedSize - lag; i++) {
+                    sum += buffer[i] * buffer[i + lag];
+                }
+                correlations[lag] = sum;
+            }
+
+            let d = 0;
+            while (correlations[d] > correlations[d + 1] && d < trimmedSize - 1) {
+                d++;
+            }
+
+            let maxValue = -1;
+            let maxIndex = -1;
+            for (let i = d; i < trimmedSize; i++) {
+                if (correlations[i] > maxValue) {
+                    maxValue = correlations[i];
+                    maxIndex = i;
+                }
+            }
+
+            if (maxIndex === -1) return 0;
+
+            // 抛物线插值
+            let T0 = maxIndex;
+            if (maxIndex > 0 && maxIndex < trimmedSize - 1) {
+                const x1 = correlations[maxIndex - 1];
+                const x2 = correlations[maxIndex];
+                const x3 = correlations[maxIndex + 1];
+                const a = (x1 + x3 - 2 * x2) / 2;
+                const b = (x3 - x1) / 2;
+                if (a) T0 = maxIndex - b / (2 * a);
+            }
+
+            return sampleRate / T0;
+        }
+    }
+
+    // ===== 游戏物理系统 =====
+    class PhysicsSystem {
+        constructor() {
+            this.playerPos = { x: 0, y: 0 };
+            this.targetPos = { x: 0, y: 0 };
+            this.isMoving = false;
+            this.isJumping = false;
+            this.animating = false;
+        }
+
+        processSoundCommand(analysis) {
+            const { averageFrequency, duration, averageVolume, volumeVariance } = analysis;
+
+            // 优先级判断
+            if (volumeVariance > CONFIG.VOLUME_VARIANCE) {
+                return 'confused';
+            }
+            if (duration < CONFIG.DURATION_SHORT && averageVolume > 0.1) {
+                this.jump();
+                return 'jump';
+            }
+            if (averageFrequency > CONFIG.FREQ_HIGH) {
+                this.move('up');
+                return 'up';
+            }
+            if (averageFrequency < CONFIG.FREQ_LOW && averageFrequency > 50) {
+                this.move('down');
+                return 'down';
+            }
+            if (duration > CONFIG.DURATION_LONG) {
+                this.move('forward');
+                return 'forward';
+            }
+
+            return 'idle';
+        }
+
+        move(direction) {
+            const speed = CONFIG.MOVE_SPEED;
+            switch (direction) {
+                case 'up':
+                    this.targetPos.y -= speed;
+                    break;
+                case 'down':
+                    this.targetPos.y += speed;
+                    break;
+                case 'forward':
+                    this.targetPos.x += speed;
+                    break;
+            }
+            this.animateMovement();
+        }
+
+        jump() {
+            if (this.isJumping) return;
+            this.isJumping = true;
+
+            const startY = this.playerPos.y;
+            const jumpHeight = CONFIG.JUMP_HEIGHT;
+            const duration = CONFIG.JUMP_DURATION;
+            const startTime = performance.now();
+
+            const animate = (currentTime) => {
+                const elapsed = currentTime - startTime;
+                const progress = Math.min(elapsed / duration, 1);
+
+                // 抛物线运动
+                const jumpOffset = jumpHeight * Math.sin(progress * Math.PI);
+                this.playerPos.y = startY - jumpOffset;
+
+                if (progress < 1) {
+                    requestAnimationFrame(animate);
+                } else {
+                    this.playerPos.y = startY;
+                    this.isJumping = false;
+                }
+            };
+
+            requestAnimationFrame(animate);
+        }
+
+        animateMovement() {
+            if (this.animating) return;
+            this.animating = true;
+
+            const animate = () => {
+                const dx = this.targetPos.x - this.playerPos.x;
+                const dy = this.targetPos.y - this.playerPos.y;
+                const distance = Math.sqrt(dx * dx + dy * dy);
+
+                if (distance < 1) {
+                    this.playerPos.x = this.targetPos.x;
+                    this.playerPos.y = this.targetPos.y;
+                    this.animating = false;
+                    return;
+                }
+
+                const speed = 0.2;
+                this.playerPos.x += dx * speed;
+                this.playerPos.y += dy * speed;
+
+                requestAnimationFrame(animate);
+            };
+
+            requestAnimationFrame(animate);
+        }
+
+        checkFragmentCollection(analysis, level) {
+            const fragments = CONFIG.FRAGMENTS[level];
+            const collected = gameState.fragments[level];
+
+            for (let i = 0; i < fragments.length; i++) {
+                if (collected[i]) continue;
+
+                const condition = fragments[i];
+                let match = true;
+
+                if (condition.minFreq && analysis.averageFrequency < condition.minFreq) match = false;
+                if (condition.maxFreq && analysis.averageFrequency > condition.maxFreq) match = false;
+                if (condition.minDuration && analysis.duration < condition.minDuration) match = false;
+                if (condition.maxDuration && analysis.duration > condition.maxDuration) match = false;
+                if (condition.minVolume && analysis.averageVolume < condition.minVolume) match = false;
+                if (condition.maxVolume && analysis.averageVolume > condition.maxVolume) match = false;
+
+                // 需要音量大于阈值
+                if (analysis.averageVolume < 0.05) match = false;
+
+                if (match) {
+                    return i;
+                }
+            }
+
+            return -1;
+        }
+
+        checkEndPoint() {
+            const allCollected = gameState.fragments[gameState.currentLevel].every(f => f);
+            return allCollected && this.playerPos.x > 200;
+        }
+    }
+
+    // ===== 录音系统 =====
+    class RecordingSystem {
+        constructor(audioSystem) {
+            this.audioSystem = audioSystem;
+            this.mediaRecorder = null;
+            this.recordedChunks = [];
+            this.startTime = 0;
+        }
+
+        async startRecording() {
+            if (!this.audioSystem.audioContext) {
+                this.audioSystem.initialize();
+            }
+
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({
+                    audio: {
+                        echoCancellation: true,
+                        noiseSuppression: true,
+                        autoGainControl: true
+                    }
+                });
+
+                this.mediaRecorder = new MediaRecorder(stream, {
+                    mimeType: MediaRecorder.isTypeSupported('audio/webm;codecs=opus') ?
+                        'audio/webm;codecs=opus' : 'audio/webm'
+                });
+
+                this.recordedChunks = [];
+                this.startTime = Date.now();
+
+                this.mediaRecorder.ondataavailable = (e) => {
+                    if (e.data.size > 0) {
+                        this.recordedChunks.push(e.data);
+                    }
+                };
+
+                this.mediaRecorder.onstop = () => {
+                    this.processRecording();
+                    stream.getTracks().forEach(track => track.stop());
+                };
+
+                this.mediaRecorder.start(100);
+                gameState.isRecording = true;
+                this.audioSystem.playStartSound();
+
+                // 开始实时分析
+                this.startRealtimeAnalysis(stream);
+
+                // 自动停止
+                setTimeout(() => {
+                    if (gameState.isRecording) {
+                        this.stopRecording();
+                    }
+                }, CONFIG.RECORD_MAX);
+
+                return true;
+            } catch (error) {
+                console.error('录音失败:', error);
+                this.audioSystem.playErrorSound();
+                showStatusHint('麦克风权限被拒绝');
+                return false;
+            }
+        }
+
+        startRealtimeAnalysis(stream) {
+            if (!this.audioSystem.audioContext) return;
+
+            const source = this.audioSystem.audioContext.createMediaStreamSource(stream);
+            const analyser = this.audioSystem.audioContext.createAnalyser();
+            analyser.fftSize = 256;
+
+            source.connect(analyser);
+
+            const bufferLength = analyser.frequencyBinCount;
+            const dataArray = new Uint8Array(bufferLength);
+
+            const visualize = () => {
+                if (!gameState.isRecording) return;
+
+                analyser.getByteFrequencyData(dataArray);
+
+                // 更新可视化
+                updateSoundVisualizer(dataArray);
+
+                // 更新环境音量
+                const avgVolume = dataArray.reduce((a, b) => a + b, 0) / bufferLength / 255;
+                audioSystem.setEnvironmentVolume(avgVolume);
+
+                gameState.animationFrame = requestAnimationFrame(visualize);
+            };
+
+            visualize();
+        }
+
+        stopRecording() {
+            const duration = Date.now() - this.startTime;
+
+            if (duration < CONFIG.RECORD_MIN) {
+                showStatusHint(`录音太短，至少需要${CONFIG.RECORD_MIN / 1000}秒`);
+                setTimeout(() => {
+                    if (this.mediaRecorder && this.mediaRecorder.state !== 'inactive') {
+                        this.mediaRecorder.stop();
+                    }
+                }, CONFIG.RECORD_MIN - duration);
+                return;
+            }
+
+            if (this.mediaRecorder && this.mediaRecorder.state !== 'inactive') {
+                this.mediaRecorder.stop();
+                gameState.isRecording = false;
+                this.audioSystem.playEndSound();
+
+                if (gameState.animationFrame) {
+                    cancelAnimationFrame(gameState.animationFrame);
+                }
+
+                // 隐藏可视化
+                elements.soundVisualizer.classList.remove('active');
+            }
+        }
+
+        async processRecording() {
+            const blob = new Blob(this.recordedChunks, { type: 'audio/webm' });
+            const arrayBuffer = await blob.arrayBuffer();
+
+            try {
+                const audioBuffer = await this.audioSystem.audioContext.decodeAudioData(arrayBuffer);
+                gameState.lastRecording = audioBuffer;
+                gameState.lastAnalysis = this.audioSystem.analyzeRecording(audioBuffer);
+
+                elements.btnPlay.disabled = false;
+                elements.btnPlay.classList.add('enabled');
+
+                this.processSoundCommand(gameState.lastAnalysis);
+            } catch (error) {
+                console.error('音频处理失败:', error);
+                this.audioSystem.playErrorSound();
+            }
+        }
+
+        processSoundCommand(analysis) {
+            const action = physicsSystem.processSoundCommand(analysis);
+
+            // 播放音效和显示反馈
+            switch (action) {
+                case 'up':
+                case 'down':
+                case 'forward':
+                    audioSystem.playMoveSound(action);
+                    showSoundRipple();
+                    showStatusHint(getActionHint(action));
+                    break;
+                case 'jump':
+                    audioSystem.playJumpSound();
+                    showSoundRipple();
+                    showStatusHint('跳跃!');
+                    break;
+                case 'confused':
+                    audioSystem.playConfusedSound();
+                    showStatusHint('太嘈杂了...');
+                    break;
+                case 'idle':
+                    showStatusHint('声音太弱');
+                    break;
+            }
+
+            // 检测碎片
+            const fragmentIndex = physicsSystem.checkFragmentCollection(analysis, gameState.currentLevel);
+            if (fragmentIndex >= 0) {
+                collectFragment(fragmentIndex);
+            }
+
+            updateDebugPanel();
+        }
+
+        playLastRecording() {
+            if (!gameState.lastRecording || gameState.isPlaying) return;
+
+            gameState.isPlaying = true;
+            elements.btnPlay.style.opacity = '0.3';
+
+            const source = audioSystem.audioContext.createBufferSource();
+            source.buffer = gameState.lastRecording;
+            source.connect(audioSystem.audioContext.destination);
+
+            source.onended = () => {
+                gameState.isPlaying = false;
+                elements.btnPlay.style.opacity = '1';
+            };
+
+            source.start();
+        }
+    }
+
+    // ===== 辅助函数 =====
+    function getActionHint(action) {
+        const hints = {
+            up: '向上移动',
+            down: '向下移动',
+            forward: '向前移动'
+        };
+        return hints[action] || '';
+    }
+
+    function showSoundRipple() {
+        const ripple = document.createElement('div');
+        ripple.className = 'sound-ripple';
+        elements.rippleContainer.appendChild(ripple);
+
+        setTimeout(() => ripple.remove(), 1000);
+    }
+
+    function showStatusHint(text) {
+        elements.statusHint.textContent = text;
+        elements.statusHint.classList.add('visible');
+
+        setTimeout(() => {
+            elements.statusHint.classList.remove('visible');
+        }, 2000);
+    }
+
+    function updateSoundVisualizer(dataArray) {
+        elements.soundVisualizer.classList.add('active');
+
+        // 动态创建柱状条
+        if (elements.soundVisualizer.children.length === 0) {
+            for (let i = 0; i < 32; i++) {
+                const bar = document.createElement('div');
+                bar.className = 'visualizer-bar';
+                elements.soundVisualizer.appendChild(bar);
+            }
+        }
+
+        const bars = elements.soundVisualizer.children;
+        const step = Math.floor(dataArray.length / 32);
+
+        for (let i = 0; i < bars.length; i++) {
+            const value = dataArray[i * step] / 255;
+            bars[i].style.height = `${value * 60}px`;
+        }
+    }
+
+    // ===== 初始化 =====
+    let audioSystem, physicsSystem, recordingSystem;
+
+    function initGame() {
+        audioSystem = new AudioSystem();
+        physicsSystem = new PhysicsSystem();
+        recordingSystem = new RecordingSystem(audioSystem);
+
+        bindButtons();
+        loadGameProgress();
+        initSoundVisualizer();
+        showGuide();
+        updateUI();
+
+        console.log('《回声信使》初始化完成');
+    }
+
+    function initSoundVisualizer() {
+        for (let i = 0; i < 32; i++) {
+            const bar = document.createElement('div');
+            bar.className = 'visualizer-bar';
+            bar.style.height = '2px';
+            elements.soundVisualizer.appendChild(bar);
+        }
+    }
+
+    function bindButtons() {
+        // 录音按钮 - 触摸和鼠标支持
+        const handleRecordStart = (e) => {
+            e.preventDefault();
+            if (gameState.isRecording) {
+                recordingSystem.stopRecording();
+                elements.btnRecord.classList.remove('recording');
+                elements.btnRecord.classList.add('completed');
+                setTimeout(() => elements.btnRecord.classList.remove('completed'), 1000);
+            } else {
+                recordingSystem.startRecording();
+                elements.btnRecord.classList.add('recording');
+            }
+        };
+
+        elements.btnRecord.addEventListener('click', handleRecordStart);
+        elements.btnRecord.addEventListener('touchend', handleRecordStart);
+
+        // 长按重置
+        const startLongPress = (e) => {
+            gameState.longPressTimer = setTimeout(() => {
+                audioSystem.playTone(300, 0.5, 'square', 0.2);
+                setTimeout(() => {
+                    if (confirm('确定重置所有进度?')) {
+                        resetGame();
+                    }
+                }, 500);
+            }, 5000);
+        };
+
+        const cancelLongPress = () => {
+            if (gameState.longPressTimer) {
+                clearTimeout(gameState.longPressTimer);
+                gameState.longPressTimer = null;
+            }
+        };
+
+        elements.btnRecord.addEventListener('mousedown', startLongPress);
+        elements.btnRecord.addEventListener('touchstart', startLongPress);
+        elements.btnRecord.addEventListener('mouseup', cancelLongPress);
+        elements.btnRecord.addEventListener('touchend', cancelLongPress);
+
+        // 播放按钮
+        elements.btnPlay.addEventListener('click', () => {
+            recordingSystem.playLastRecording();
+        });
+
+        // 求助按钮
+        elements.btnHelp.addEventListener('click', () => {
+            audioSystem.playHelpSound();
+            const hintIndex = getHintForCurrentLevel();
+            audioSystem.playFragmentHint(hintIndex);
+            showStatusHint(`试试: ${CONFIG.FRAGMENTS[gameState.currentLevel][hintIndex].name}`);
+        });
+
+        // F12调试
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'F12') {
+                e.preventDefault();
+                gameState.debugMode = !gameState.debugMode;
+                elements.debugPanel.classList.toggle('visible', gameState.debugMode);
+            }
+        });
+    }
+
+    function getHintForCurrentLevel() {
+        const collected = gameState.fragments[gameState.currentLevel];
+        const uncollected = collected.findIndex((c, i) => !c);
+        return uncollected >= 0 ? uncollected : 0;
+    }
+
+    // ===== 进度管理 =====
+    function loadGameProgress() {
+        try {
+            const saved = localStorage.getItem('echoMessenger');
+            if (saved) {
+                const data = JSON.parse(saved);
+                gameState.currentLevel = data.currentLevel || 0;
+                gameState.fragments = data.fragments || gameState.fragments;
+            }
+        } catch (error) {
+            console.error('加载进度失败:', error);
+        }
+    }
+
+    function saveGameProgress() {
+        try {
+            localStorage.setItem('echoMessenger', JSON.stringify({
+                currentLevel: gameState.currentLevel,
+                fragments: gameState.fragments
+            }));
+        } catch (error) {
+            console.error('保存进度失败:', error);
+        }
+    }
+
+    function resetGame() {
+        gameState.currentLevel = 0;
+        gameState.fragments = [[false, false, false], [false, false, false], [false, false, false]];
+        gameState.playerPos = { x: 0, y: 0 };
+        physicsSystem.playerPos = { x: 0, y: 0 };
+        physicsSystem.targetPos = { x: 0, y: 0 };
+
+        saveGameProgress();
+        updateUI();
+        audioSystem.playErrorSound();
+        showStatusHint('游戏已重置');
+    }
+
+    // ===== 碎片收集 =====
+    function collectFragment(index) {
+        gameState.fragments[gameState.currentLevel][index] = true;
+        saveGameProgress();
+        updateUI();
+
+        // 动画效果
+        elements.fragments[index].classList.add('collecting');
+        setTimeout(() => elements.fragments[index].classList.remove('collecting'), 500);
+
+        audioSystem.playCollectSound();
+        showStatusHint(`收集: ${CONFIG.FRAGMENTS[gameState.currentLevel][index].name}`);
+
+        // 检查通关
+        const allCollected = gameState.fragments[gameState.currentLevel].every(f => f);
+        if (allCollected) {
+            setTimeout(() => {
+                showVictory();
+            }, 1000);
+        }
+    }
+
+    function showVictory() {
+        audioSystem.playVictorySound();
+        elements.victoryOverlay.classList.add('visible');
+
+        if (gameState.currentLevel < 2) {
+            elements.victorySubtitle.textContent = `进入: ${CONFIG.LEVELS[gameState.currentLevel + 1].name}`;
+            setTimeout(() => {
+                gameState.currentLevel++;
+                saveGameProgress();
+                updateUI();
+                elements.victoryOverlay.classList.remove('visible');
+
+                // 重置位置
+                physicsSystem.playerPos = { x: 0, y: 0 };
+                physicsSystem.targetPos = { x: 0, y: 0 };
+            }, 3000);
+        } else {
+            elements.victorySubtitle.textContent = '恭喜通关所有关卡!';
+            setTimeout(() => {
+                elements.victoryOverlay.classList.remove('visible');
+            }, 5000);
+        }
+    }
+
+    // ===== UI更新 =====
+    function updateUI() {
+        // 碎片
+        const fragments = gameState.fragments[gameState.currentLevel];
+        elements.fragments.forEach((el, i) => {
+            el.classList.toggle('collected', fragments[i]);
+        });
+
+        // 关卡
+        elements.levelIndicator.textContent = `第${gameState.currentLevel + 1}关: ${CONFIG.LEVELS[gameState.currentLevel].name}`;
+
+        // 环境音效
+        audioSystem.startEnvironment(CONFIG.LEVELS[gameState.currentLevel].bgSound);
+    }
+
+    function updateDebugPanel() {
+        if (!gameState.debugMode || !gameState.lastAnalysis) return;
+
+        const a = gameState.lastAnalysis;
+        document.getElementById('debugFreq').textContent = a.averageFrequency.toFixed(1);
+        document.getElementById('debugDuration').textContent = a.duration.toFixed(2);
+        document.getElementById('debugVolume').textContent = a.averageVolume.toFixed(3);
+        document.getElementById('debugVariance').textContent = a.volumeVariance.toFixed(3);
+        document.getElementById('debugAction').textContent = physicsSystem.isMoving ? '移动' : physicsSystem.isJumping ? '跳跃' : '静止';
+        document.getElementById('debugPos').textContent = `${physicsSystem.playerPos.x.toFixed(0)}, ${physicsSystem.playerPos.y.toFixed(0)}`;
+        document.getElementById('debugLevel').textContent = gameState.currentLevel + 1;
+        document.getElementById('debugFragments').textContent = `${gameState.fragments[gameState.currentLevel].filter(f => f).length}/3`;
+    }
+
+    // ===== 游戏引导 =====
+    function showGuide() {
+        const isFirstTime = !localStorage.getItem('echoMessengerPlayed');
+
+        if (isFirstTime) {
+            elements.guideOverlay.classList.add('visible');
+
+            setTimeout(() => {
+                audioSystem.initialize();
+                audioSystem.playTone(600, 0.8, 'sine', 0.2);
+            }, 500);
+
+            setTimeout(() => {
+                audioSystem.playTone(800, 0.8, 'sine', 0.2);
+            }, 1500);
+
+            setTimeout(() => {
+                elements.guideOverlay.classList.remove('visible');
+                localStorage.setItem('echoMessengerPlayed', 'true');
+            }, 3500);
+        }
+    }
+
+    // ===== 启动 =====
+    window.addEventListener('DOMContentLoaded', initGame);
+
+    document.addEventListener('visibilitychange', () => {
+        if (document.hidden && gameState.isRecording) {
+            recordingSystem.stopRecording();
+        }
+    });
+
+    // 防止意外关闭
+    window.addEventListener('beforeunload', (e) => {
+        if (gameState.isRecording) {
+            e.preventDefault();
+            e.returnValue = '';
+        }
+    });
+    </script>
+</body>
+</html>
