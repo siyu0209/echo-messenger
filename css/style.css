@@ -1,0 +1,450 @@
+* {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+            user-select: none;
+        }
+
+        body {
+            background: #000;
+            min-height: 100vh;
+            overflow: hidden;
+            font-family: Arial, sans-serif;
+            touch-action: manipulation;
+        }
+
+        .game-container {
+            position: relative;
+            width: 100%;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+        }
+
+        /* 声音波纹背景 */
+        .sound-ripple {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 0;
+            height: 0;
+            border-radius: 50%;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            animation: ripple 1s ease-out forwards;
+            pointer-events: none;
+        }
+
+        @keyframes ripple {
+            to {
+                width: 300px;
+                height: 300px;
+                opacity: 0;
+            }
+        }
+
+        /* 按钮容器 */
+        .buttons-container {
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            z-index: 10;
+        }
+
+        /* 录音按钮 */
+        .btn-record {
+            width: 120px;
+            height: 120px;
+            border-radius: 50%;
+            background: #fff;
+            border: none;
+            cursor: pointer;
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+            position: relative;
+            outline: none;
+            box-shadow: 0 0 30px rgba(255, 255, 255, 0.3);
+        }
+
+        .btn-record:hover {
+            transform: scale(1.1);
+            box-shadow: 0 0 50px rgba(255, 255, 255, 0.5);
+        }
+
+        .btn-record:active {
+            transform: scale(0.95);
+        }
+
+        .btn-record.recording {
+            background: #ff3333;
+            animation: pulse 1s infinite;
+            box-shadow: 0 0 50px rgba(255, 0, 0, 0.5);
+        }
+
+        .btn-record.completed {
+            background: #33ff33;
+            box-shadow: 0 0 50px rgba(0, 255, 0, 0.5);
+        }
+
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+        }
+
+        /* 录音按钮内部图标 */
+        .btn-record::after {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 40px;
+            height: 40px;
+            background: #000;
+            border-radius: 50%;
+            transition: background 0.3s;
+        }
+
+        .btn-record.recording::after {
+            width: 30px;
+            height: 30px;
+            border-radius: 5px;
+        }
+
+        .btn-record.completed::after {
+            background: #000;
+            width: 20px;
+            height: 20px;
+            border-radius: 0 0 0 0;
+            border-left: 3px solid #000;
+            border-bottom: 3px solid #000;
+            transform: translate(-50%, -60%) rotate(-45deg);
+        }
+
+        /* 播放按钮 */
+        .btn-play {
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            background: #0066ff;
+            border: none;
+            cursor: pointer;
+            transition: all 0.2s;
+            margin-top: 20px;
+            outline: none;
+            opacity: 0.5;
+            box-shadow: 0 0 20px rgba(0, 102, 255, 0.3);
+        }
+
+        .btn-play:hover:not(:disabled) {
+            transform: scale(1.1);
+            opacity: 1;
+            box-shadow: 0 0 30px rgba(0, 102, 255, 0.5);
+        }
+
+        .btn-play:active:not(:disabled) {
+            transform: scale(0.95);
+        }
+
+        .btn-play:disabled {
+            background: #333;
+            cursor: not-allowed;
+            box-shadow: none;
+        }
+
+        .btn-play.enabled {
+            opacity: 1;
+        }
+
+        /* 播放按钮三角形 */
+        .btn-play::after {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 55%;
+            transform: translate(-50%, -50%);
+            width: 0;
+            height: 0;
+            border-top: 12px solid transparent;
+            border-bottom: 12px solid transparent;
+            border-left: 20px solid #fff;
+        }
+
+        /* 求助按钮 */
+        .btn-help {
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            background: #ffcc00;
+            border: none;
+            cursor: pointer;
+            transition: all 0.2s;
+            position: absolute;
+            right: -80px;
+            bottom: 0;
+            outline: none;
+            box-shadow: 0 0 15px rgba(255, 204, 0, 0.3);
+        }
+
+        .btn-help:hover {
+            transform: scale(1.1);
+            box-shadow: 0 0 25px rgba(255, 204, 0, 0.5);
+        }
+
+        .btn-help:active {
+            transform: scale(0.95);
+        }
+
+        /* 问号图标 */
+        .btn-help::after {
+            content: '?';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: #000;
+            font-size: 24px;
+            font-weight: bold;
+        }
+
+        /* 进度指示器 */
+        .progress-container {
+            position: fixed;
+            top: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 15px;
+            z-index: 100;
+        }
+
+        .fragment {
+            width: 25px;
+            height: 25px;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.1);
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .fragment.collected {
+            background: #00ff00;
+            border-color: #00ff00;
+            box-shadow: 0 0 20px rgba(0, 255, 0, 0.5);
+            transform: scale(1.2);
+        }
+
+        .fragment.collecting {
+            animation: collect 0.5s ease-out;
+        }
+
+        @keyframes collect {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.5); }
+            100% { transform: scale(1.2); }
+        }
+
+        /* 关卡指示器 */
+        .level-indicator {
+            position: fixed;
+            top: 70px;
+            left: 50%;
+            transform: translateX(-50%);
+            color: rgba(255, 255, 255, 0.5);
+            font-size: 14px;
+            z-index: 100;
+        }
+
+        /* 声音分析可视化 */
+        .sound-visualizer {
+            position: fixed;
+            bottom: 100px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 3px;
+            align-items: flex-end;
+            height: 60px;
+            z-index: 100;
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+
+        .sound-visualizer.active {
+            opacity: 1;
+        }
+
+        .visualizer-bar {
+            width: 4px;
+            background: linear-gradient(to top, #00ff00, #ff0000);
+            border-radius: 2px;
+            transition: height 0.05s;
+        }
+
+        /* 状态提示 */
+        .status-hint {
+            position: fixed;
+            bottom: 180px;
+            left: 50%;
+            transform: translateX(-50%);
+            color: rgba(255, 255, 255, 0.6);
+            font-size: 12px;
+            z-index: 100;
+            opacity: 0;
+            transition: opacity 0.3s;
+            text-align: center;
+        }
+
+        .status-hint.visible {
+            opacity: 1;
+        }
+
+        /* 调试面板 */
+        .debug-panel {
+            position: fixed;
+            bottom: 10px;
+            left: 10px;
+            background: rgba(0, 0, 0, 0.9);
+            color: #0f0;
+            padding: 15px;
+            font-size: 11px;
+            font-family: 'Courier New', monospace;
+            display: none;
+            z-index: 1000;
+            border: 1px solid #0f0;
+            border-radius: 5px;
+        }
+
+        .debug-panel.visible {
+            display: block;
+        }
+
+        .debug-panel div {
+            margin-bottom: 5px;
+        }
+
+        .debug-panel .label {
+            color: #888;
+        }
+
+        /* 游戏引导 */
+        .guide-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.95);
+            z-index: 2000;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.5s;
+        }
+
+        .guide-overlay.visible {
+            opacity: 1;
+            pointer-events: all;
+        }
+
+        .guide-circle {
+            width: 150px;
+            height: 150px;
+            border: 3px solid rgba(255, 255, 255, 0.8);
+            border-radius: 50%;
+            animation: guidePulse 2s infinite;
+            position: relative;
+        }
+
+        .guide-circle::after {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 50px;
+            height: 50px;
+            background: #fff;
+            border-radius: 50%;
+        }
+
+        @keyframes guidePulse {
+            0%, 100% { transform: scale(1); opacity: 1; }
+            50% { transform: scale(1.1); opacity: 0.8; }
+        }
+
+        .guide-text {
+            color: rgba(255, 255, 255, 0.8);
+            margin-top: 30px;
+            font-size: 18px;
+        }
+
+        /* 通关提示 */
+        .victory-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.9);
+            z-index: 1500;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.5s;
+        }
+
+        .victory-overlay.visible {
+            opacity: 1;
+            pointer-events: all;
+        }
+
+        .victory-title {
+            color: #00ff00;
+            font-size: 48px;
+            margin-bottom: 20px;
+            text-shadow: 0 0 30px rgba(0, 255, 0, 0.5);
+        }
+
+        .victory-subtitle {
+            color: rgba(255, 255, 255, 0.8);
+            font-size: 18px;
+        }
+
+        /* 移动端适配 */
+        @media (max-width: 600px) {
+            .btn-record {
+                width: 100px;
+                height: 100px;
+            }
+
+            .btn-record::after {
+                width: 35px;
+                height: 35px;
+            }
+
+            .btn-play {
+                width: 50px;
+                height: 50px;
+                margin-top: 15px;
+            }
+
+            .btn-help {
+                width: 40px;
+                height: 40px;
+                right: -60px;
+            }
+
+            .btn-help::after {
+                font-size: 20px;
+            }
+        }
